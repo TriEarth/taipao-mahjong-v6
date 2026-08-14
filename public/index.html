@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"><meta name="theme-color" content="#071c18"><title>台炮 · 平阳麻将</title><link rel="stylesheet" href="/styles.css?v=6.0.0"></head>
+<body>
+  <div id="entry" class="entry-page">
+    <section class="hero">
+      <div class="brand"><span>炮</span><div><h1>台炮</h1><p>平阳麻将 · 四人联机</p></div></div>
+      <div class="hero-copy"><small>THE PINGYANG CLASSIC</small><h2>两张财神，<br><em>一桌真朋友。</em></h2><p>四人 · 十六张 · 禁吃 · 双财神公开 · 一家胡三家赔</p></div>
+      <div class="demo-caishen"><i>财</i><div class="demo-card"><img src="/assets/tiles/03-red-dragon.svg"><b>公开财神</b></div><div class="demo-card tilt"><img src="/assets/tiles/31-bamboos-6.svg"><b>百搭随局变</b></div></div>
+    </section>
+    <section class="entry-panel">
+      <div class="tabs"><button class="active" data-tab="create">创建房间</button><button data-tab="join">加入房间</button></div>
+      <form id="entryForm"><label>你的称呼<input id="nameInput" maxlength="10" placeholder="请输入昵称" autocomplete="nickname" required></label><label id="roomField" hidden>六位房间码<input id="roomInput" inputmode="numeric" maxlength="6" placeholder="例如 583921"></label><button class="primary" id="entrySubmit">创建私人牌桌</button></form>
+      <button class="solo-entry" id="soloBtn"><span>单机测试</span><small>立即与三名电脑玩家开局</small><i>→</i></button>
+      <div class="entry-note"><span>◇</span><p><b>好友房，无需注册</b><small>创建后复制邀请链接给朋友即可</small></p></div>
+      <p class="source-note">本作依照平阳台炮常见规则制作，仅供娱乐，不涉及真钱。</p>
+    </section>
+  </div>
+
+  <div id="lobby" class="lobby-page" hidden>
+    <header><div class="brand small"><span>炮</span><div><h1>台炮</h1><p>线上好友房</p></div></div><div class="lobby-tools"><div class="connection"><i></i>已连接</div><button class="exit-button" id="lobbyExitBtn">退出房间</button></div></header>
+    <main><small>PRIVATE TABLE</small><h2>等待麻友入座</h2><p>邀请朋友，人数不足时房主可添加电脑玩家补位</p><div class="room-code"><span>房间号</span><b id="lobbyCode">------</b><button id="copyInvite">复制邀请链接</button></div><div class="seats" id="lobbySeats"></div><div class="lobby-actions"><button id="addBotBtn">＋ 添加电脑玩家</button><button class="primary start" id="startBtn">等待玩家...</button></div><p class="lobby-tip">请保持此页面打开 · 断线后使用同一浏览器可自动回座</p></main>
+  </div>
+
+  <div id="game" class="game-page" hidden>
+    <header class="topbar"><div class="brand small"><span>炮</span><div><h1>台炮</h1><p>平阳麻将</p></div></div><div class="round"><span id="roundText">第 1 局</span><i></i><span id="roomText">房间 ------</span><i></i><span id="wallText">余牌 0</span></div><nav><button id="inviteBtn">邀请</button><button id="rulesBtn">规则</button><button class="exit-button" id="gameExitBtn">退出</button></nav></header>
+    <main class="stage"><div class="table">
+      <section class="caishen-box"><div class="label"><i>财</i><p><b>本局财神</b><small>同牌面的牌均为百搭</small></p></div><div id="caishenTiles" class="caishen-tiles"></div></section>
+      <div class="player north" data-seat="2"></div><div class="player west" data-seat="1"></div><div class="player east" data-seat="3"></div><div class="player south" data-seat="0"></div>
+      <div class="river north-river" data-river="2"></div><div class="river west-river" data-river="1"></div><div class="river east-river" data-river="3"></div><div class="river south-river" data-river="0"></div>
+      <div class="center"><span id="turnWind">东</span><b id="centerWall">0</b><small>余牌</small><i id="turnDot"></i></div><div class="status" id="status">等待牌局状态…</div>
+      <div id="myMelds" class="my-melds"></div><div id="myFlowers" class="my-flowers"></div><div id="myHand" class="hand"></div>
+    </div><aside><div class="aside-head"><b>牌局动态</b><span class="live">● LIVE</span></div><div id="logs"></div><div class="rule-tags"><b>本桌规则</b><span>逆时针出牌</span><span>禁止吃牌</span><span>同财神1张7台</span><span>双财神胡15台</span><span>3+1胡15台</span><span>无财神胡+5台</span><span>房主确认后结算</span></div></aside></main>
+    <footer><div id="hint"><b>等待其他玩家</b><small>牌局状态会实时同步</small></div><div id="actions"></div></footer>
+  </div>
+
+  <dialog id="rulesDialog"><button class="x" data-close>×</button><small>TABLE RULES · V6</small><h2>平阳台炮 · 本桌规则</h2><div class="rules-grid"><section><b>同牌双财神</b><p>两张指示牌允许相同，此时全场只剩两张财神；持有一张计7台，摸齐两张可选择15台直接胡。</p></section><section><b>普通财神</b><p>两种财神局中，普通财神同种1/2/3张分别计2/5/8台；字牌、白板或花牌财神分别计3/7/11台。</p></section><section><b>3+1财神胡</b><p>一种财神3张加另一种1张：不能正常成牌也可选15台胡；能正常成牌时，在财神台数基础上再加15台。</p></section><section><b>台数与筹码</b><p>胡牌先展示四家自动台数，由房主修改确认。确认后非胡玩家按台数差互付；胡家向每家收自己的完整台数；涉及庄家收付双倍。</p></section><section><b>白板与花牌</b><p>未成为财神时摸到即公开补牌；白板按1/3/5/10台，红花与黑花分开按同一阶梯计算，起手四白15台。</p></section><section><b>其他台型</b><p>无财神胡牌加5台；另支持清牌、清混一色、对对胡、四风刻、明暗杠、杠上开花、自摸和抢杠胡等文档台型。</p></section></div><p class="fine">东、南、西、北沿出牌方向逆时针排列；摸牌先停在手牌最右侧，出牌后才自动整理。</p></dialog>
+  <dialog id="resultDialog" class="result"><small>ROUND RESULT</small><div class="stamp" id="resultStamp">胡</div><h2 id="resultTitle">本局结束</h2><p id="resultSub"></p><div id="resultRows"></div><div id="settlementActions"><button class="primary" id="confirmTaiBtn">房主确认台数并结算筹码</button><small id="settlementHint">等待房主核对四家台数</small></div><h3>四家牌面与自动计台</h3><div id="resultHands"></div><button class="primary" id="nextBtn">房主开启下一局</button></dialog>
+  <div id="toast" class="toast"></div><script src="/app.js?v=6.0.0"></script>
+</body></html>
