@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: taipao-mahjong
+    runtime: node
+    plan: free
+    buildCommand: ""
+    startCommand: node server.js
+    envVars:
+      - key: NODE_VERSION
+        value: 22
