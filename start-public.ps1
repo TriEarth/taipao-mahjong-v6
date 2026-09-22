@@ -33,6 +33,7 @@ function Test-LocalServer {
 
 $serverProcess = $null
 $tunnelProcess = $null
+$launcherFailed = $false
 
 try {
     if (-not (Test-Path -LiteralPath $cloudflared)) {
@@ -102,8 +103,16 @@ try {
         Write-Host ("SELFTEST HTTP STATUS: {0}" -f $testResponse.StatusCode)
         return
     }
-    Wait-Process -Id $tunnelProcess.Id
+    # The homepage can stop the local server. Close its public tunnel as well.
+    while (-not $tunnelProcess.HasExited) {
+        Start-Sleep -Seconds 1
+        if (-not (Test-LocalServer)) {
+            Write-Host 'Mahjong server stopped. Closing the public tunnel.'
+            break
+        }
+    }
 } catch {
+    $launcherFailed = $true
     Write-Host ''
     Write-Host ('START FAILED: ' + $_.Exception.Message) -ForegroundColor Red
 } finally {
@@ -113,4 +122,11 @@ try {
     if ($serverProcess -and -not $serverProcess.HasExited) {
         Stop-Process -Id $serverProcess.Id -Force -ErrorAction SilentlyContinue
     }
+    if ($publicUrl -and (Test-Path -LiteralPath $addressFile)) {
+        if ((Get-Content -LiteralPath $addressFile -Raw).Trim() -eq $publicUrl) {
+            Remove-Item -LiteralPath $addressFile -Force -ErrorAction SilentlyContinue
+        }
+    }
+    Set-Location -LiteralPath $env:TEMP
 }
+if ($launcherFailed) { exit 1 }

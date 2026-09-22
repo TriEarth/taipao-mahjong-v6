@@ -16,12 +16,15 @@ if errorlevel 1 (
   )
 )
 
-echo Starting Taipao Mahjong server...
-echo Keep this window open while playing.
+echo Starting or connecting to Taipao Mahjong...
 echo.
 set "PORT=3005"
-"%NODE_EXE%" server.js
-
-echo.
-echo Server stopped.
-pause
+"%NODE_EXE%" start-local.js
+set "TAIPAO_EXIT_CODE=%ERRORLEVEL%"
+cd /d "%TEMP%"
+if not "%TAIPAO_EXIT_CODE%"=="0" (
+  echo.
+  echo Startup failed. See the message above.
+  pause
+)
+exit /b %TAIPAO_EXIT_CODE%
