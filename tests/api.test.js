@@ -23,6 +23,22 @@ test('HTTP单机模式可创建、读取状态并退出',async()=>{
     const started=await fetch(base+'/api/action',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...friend,type:'start'})});assert.equal(started.status,200);
     const friendGame=await (await fetch(`${base}/api/state?room=${friend.room}&token=${friend.token}`)).json();assert.equal(friendGame.phase,'playing');assert.deepEqual(friendGame.players.map(p=>p.wind),[0,3,2,1]);
     await fetch(base+'/api/leave',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(friend)});
+
+    const post=async(path,data)=>fetch(base+path,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(data)});
+    const three=await (await post('/api/create',{name:'三人房主',mode:'three'})).json();
+    const second=await (await post('/api/join',{name:'第二位',room:three.room})).json();
+    await post('/api/action',{...three,type:'addBot'});
+    assert.equal((await post('/api/join',{name:'第四位',room:three.room})).status,400);
+    assert.equal((await post('/api/action',{...three,type:'addBot'})).status,400);
+    const joined=await (await fetch(`${base}/api/state?room=${second.room}&token=${second.token}`)).json();
+    assert.equal(joined.mode,'three');assert.equal(joined.playerCount,3);assert.equal(joined.minTai,10);assert.equal(joined.doubleAt,17);
+    assert.equal((await post('/api/action',{...three,type:'start'})).status,200);
+    const threeGame=await (await fetch(`${base}/api/state?room=${three.room}&token=${three.token}`)).json();
+    assert.deepEqual(threeGame.handCounts,[17,16,16]);assert.equal(threeGame.players.length,3);
+    await post('/api/leave',three);
+    const soloThree=await (await post('/api/solo',{name:'三人单机',mode:'three'})).json();
+    assert.equal(rooms.get(soloThree.room).players.length,3);await post('/api/leave',soloThree);
+    assert.equal((await post('/api/create',{name:'错误模式',mode:'invalid'})).status,400);
   }finally{
     for(const room of rooms.values())if(room.botTimer)clearTimeout(room.botTimer);
     rooms.clear();await new Promise(resolve=>server.close(resolve));
