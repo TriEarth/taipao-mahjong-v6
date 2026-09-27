@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="zh-CN">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"><meta name="theme-color" content="#071c18"><title>台炮 · 平阳麻将</title><link rel="stylesheet" href="/styles.css?v=6.1.5"></head>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"><meta name="theme-color" content="#071c18"><title>台炮 · 平阳麻将 V7</title><link rel="stylesheet" href="/styles.css?v=7.0.0"></head>
 <body>
   <div id="entry" class="entry-page">
     <section class="hero">
@@ -10,7 +10,7 @@
     </section>
     <section class="entry-panel">
       <div class="tabs"><button class="active" data-tab="create">创建房间</button><button data-tab="join">加入房间</button></div>
-      <label class="mode-field">玩法模式<select id="modeInput"><option value="four">四人经典</option><option value="three">三人玩法 · 10台起胡，17台翻</option></select></label><p id="modeHint" class="mode-hint"></p><p class="mode-join-note">创建房间、单机测试使用所选模式；加入房间随房主模式。</p>
+      <label class="mode-field">玩法模式<select id="modeInput"><option value="four">四人经典</option><option value="three">三人玩法 · 10台起胡，17台翻</option></select></label><label class="mode-field">电脑难度<select id="difficultyInput"><option value="easy">简单 · 随机出牌</option><option value="medium" selected>中等 · 保留基本牌型</option><option value="hard">困难 · 牌效与安全牌</option><option value="hell">地狱 · 综合牌效判断</option></select></label><p id="modeHint" class="mode-hint"></p><p class="mode-join-note">创建房间、单机测试使用所选模式；加入房间随房主模式。</p>
       <form id="entryForm"><label>你的称呼<input id="nameInput" maxlength="10" placeholder="请输入昵称" autocomplete="nickname" required></label><label id="roomField" hidden>六位房间码<input id="roomInput" inputmode="numeric" maxlength="6" placeholder="例如 583921"></label><button class="primary" id="entrySubmit">创建私人牌桌</button></form>
       <button class="solo-entry" id="soloBtn"><span>单机测试</span><small>立即与三名电脑玩家开局</small><i>→</i></button>
       <button class="exit-button full-exit" id="fullyQuitBtn" type="button">完全退出</button>
@@ -23,7 +23,7 @@
   <div id="exitScreen" class="exit-screen" hidden><h1>已完全退出</h1><p id="exitStatus"></p><p id="exitRestart"></p></div>
   <div id="lobby" class="lobby-page" hidden>
     <header><div class="brand small"><span>炮</span><div><h1>台炮</h1><p>线上好友房</p></div></div><div class="lobby-tools"><div class="connection"><i></i>已连接</div><button class="exit-button" id="lobbyExitBtn">退出房间</button></div></header>
-    <main><small>PRIVATE TABLE</small><h2>等待麻友入座</h2><p id="lobbyMode" class="mode-badge"></p><p>邀请朋友，人数不足时房主可添加电脑玩家补位</p><div class="room-code"><span>房间号</span><b id="lobbyCode">------</b><button id="copyInvite">复制邀请链接</button></div><div class="seats" id="lobbySeats"></div><div class="lobby-actions"><button id="addBotBtn">＋ 添加电脑玩家</button><button class="primary start" id="startBtn">等待玩家...</button></div><p class="lobby-tip">请保持此页面打开 · 断线后使用同一浏览器可自动回座</p></main>
+    <main><small>PRIVATE TABLE</small><h2>等待麻友入座</h2><p id="lobbyMode" class="mode-badge"></p><p>邀请朋友，人数不足时房主可添加电脑玩家补位</p><div class="room-code"><span>房间号</span><b id="lobbyCode">------</b><button id="copyInvite">复制邀请链接</button></div><div class="seats" id="lobbySeats"></div><div class="lobby-actions"><button id="addBotBtn">＋ 添加电脑玩家</button><button class="primary start" id="startBtn">等待玩家...</button></div><label class="lobby-difficulty" id="lobbyDifficultyWrap">电脑难度<select id="lobbyDifficulty"><option value="easy">简单</option><option value="medium">中等</option><option value="hard">困难</option><option value="hell">地狱</option></select></label><p class="lobby-tip">请保持此页面打开 · 断线后使用同一浏览器可自动回座</p></main>
   </div>
 
   <div id="game" class="game-page" hidden>
@@ -38,7 +38,7 @@
     <footer><div id="hint"><b>等待其他玩家</b><small>牌局状态会实时同步</small></div><div id="actions"></div></footer>
   </div>
 
-  <dialog id="rulesDialog"><button class="x" data-close>×</button><small>TABLE RULES · V6</small><h2>平阳台炮 · 本桌规则</h2><div class="rules-grid"><section><b id="modeRuleTitle"></b><p id="modeRuleText"></p></section><section><b>同牌双财神</b><p>两张指示牌允许相同，此时全场只剩两张财神；持有一张计7台，摸齐两张可选择15台直接胡。</p></section><section><b>普通财神</b><p>两种财神局中，普通财神同种1/2/3张分别计2/5/8台；字牌、白板或花牌财神分别计3/7/11台。</p></section><section><b>3+1财神胡</b><p id="caishen31Rule">一种财神3张加另一种1张：不能正常成牌也可选15台胡；能正常成牌时，在财神台数基础上再加15台。</p></section><section><b>台数与筹码</b><p id="settlementRule">胡牌先展示各家自动台数，由房主修改确认。确认后非胡玩家按台数差互付；胡家向每家收自己的完整台数；涉及庄家收付双倍。</p></section><section><b>白板与花牌</b><p>未成为财神时摸到即公开补牌；白板按1/3/5/10台，红花与黑花分开按同一阶梯计算，起手四白15台。</p></section><section><b>牌山与分张</b><p id="wallRule"></p></section><section><b>其他台型</b><p>无财神胡牌加5台；另支持清牌、清混一色、对对胡、四风刻、明暗杠、杠上开花、自摸和抢杠胡等文档台型。</p></section></div><p class="fine">庄家为东，沿出牌方向逆时针排风（三人为东、南、西）；摸牌先停在手牌最右侧，出牌后才自动整理。</p></dialog>
+  <dialog id="rulesDialog"><button class="x" data-close>×</button><small>TABLE RULES · V7</small><h2>平阳台炮 · 本桌规则</h2><div class="rules-grid"><section><b id="modeRuleTitle"></b><p id="modeRuleText"></p></section><section><b>同牌双财神</b><p>两张指示牌允许相同，此时全场只剩两张财神；持有一张计7台，摸齐两张可选择15台直接胡。</p></section><section><b>普通财神</b><p>两种财神局中，普通财神同种1/2/3张分别计2/5/8台；字牌、白板或花牌财神分别计3/7/11台。</p></section><section><b>3+1财神胡</b><p id="caishen31Rule">一种财神3张加另一种1张：不能正常成牌也可选15台胡；能正常成牌时，在财神台数基础上再加15台。</p></section><section><b>台数与筹码</b><p id="settlementRule">胡牌先展示各家自动台数，由房主修改确认。确认后非胡玩家按台数差互付；胡家向每家收自己的完整台数；涉及庄家收付双倍。</p></section><section><b>白板与花牌</b><p>未成为财神时摸到即公开补牌；白板按1/3/5/10台，红花与黑花分开按同一阶梯计算，起手四白15台。</p></section><section><b>牌山与分张</b><p id="wallRule"></p></section><section><b>电脑难度</b><p>简单保留随机性；中等保留对子、顺子和基本牌型；困难加入公开牌安全度；地狱使用确定性的综合牌效判断，并减少无价值的碰牌。</p></section><section><b>其他台型</b><p>无财神胡牌加5台；另支持清牌、清混一色、对对胡、四风刻、明暗杠、杠上开花、自摸和抢杠胡等文档台型。</p></section></div><p class="fine">庄家为东，沿出牌方向逆时针排风（三人为东、南、西）；摸牌先停在手牌最右侧，出牌后才自动整理。</p></dialog>
   <dialog id="resultDialog" class="result"><small>ROUND RESULT</small><div class="stamp" id="resultStamp">胡</div><h2 id="resultTitle">本局结束</h2><p id="resultSub"></p><div id="resultRows"></div><div id="settlementActions"><button class="primary" id="confirmTaiBtn">房主确认台数并结算筹码</button><small id="settlementHint">等待房主核对各家台数</small></div><h3>各家牌面与自动计台</h3><div id="resultHands"></div><button class="primary" id="nextBtn">房主开启下一局</button></dialog>
-  <div id="toast" class="toast"></div><script src="/app.js?v=6.1.5"></script>
+  <div id="toast" class="toast"></div><script src="/app.js?v=7.0.0"></script>
 </body></html>
