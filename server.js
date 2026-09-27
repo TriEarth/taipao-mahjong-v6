@@ -24,6 +24,13 @@ const MODES = {
   four: {name:'四人经典',players:4,minTai:0,doubleAt:0},
   three: {name:'三人玩法',players:3,minTai:10,doubleAt:17}
 };
+const BOT_DIFFICULTIES = {
+  easy: {name:'简单',level:0},
+  medium: {name:'中等',level:1},
+  hard: {name:'困难',level:2},
+  hell: {name:'地狱',level:3}
+};
+function normalizeBotDifficulty(value){return Object.hasOwn(BOT_DIFFICULTIES,String(value))?String(value):'medium'}
 const rulesFor = room => MODES[room.mode || 'four'];
 const playerCount = room => rulesFor(room).players;
 const previousSeat = (room,seat,distance=1) => (seat-distance+playerCount(room))%playerCount(room);
@@ -70,13 +77,13 @@ function canWin(hand, meldCount, indicators){
   for(let i=0;i<33;i++)if(c[i]){const use=Math.min(2,c[i]),need=2-use;if(need<=wild){c[i]-=use;if(melds(c,wild-need,needed)){c[i]+=use;return true}c[i]+=use;}}
   return wild>=2 && melds(c,wild-2,needed);
 }
-function makeRoom(hostName,token,mode='four'){
+function makeRoom(hostName,token,mode='four',botDifficulty='medium'){
   if(!Object.hasOwn(MODES,mode))throw Error('未知玩法模式');
-  const code=roomCode();const room={code,mode,hostToken:token,phase:'lobby',players:[],clients:new Map(),game:null,created:Date.now()};
+  const code=roomCode();const room={code,mode,hostToken:token,botDifficulty:normalizeBotDifficulty(botDifficulty),phase:'lobby',players:[],clients:new Map(),game:null,created:Date.now()};
   room.players.push({token,name:cleanName(hostName),score:0,connected:true});rooms.set(code,room);return room;
 }
-function makeSoloRoom(hostName,token,mode='four'){
-  const room=makeRoom(hostName,token,mode);room.solo=true;
+function makeSoloRoom(hostName,token,mode='four',botDifficulty='medium'){
+  const room=makeRoom(hostName,token,mode,botDifficulty);room.solo=true;
   ['阿炮','小台','财神'].slice(0,playerCount(room)-1).forEach((name,i)=>room.players.push({token:`bot-${room.code}-${i}`,name,score:0,connected:true,bot:true}));
   startGame(room);return room;
 }
@@ -88,6 +95,11 @@ function addBot(room,token){
   const name=base.find(n=>!used.has(n))||`电脑${room.players.filter(p=>p.bot).length+1}`;
   room.players.push({token:`bot-${room.code}-${uid()}`,name,score:0,connected:true,bot:true});
   broadcast(room);return room.players.at(-1);
+}
+function setBotDifficulty(room,token,difficulty){
+  if(room.hostToken!==token)throw Error('只有房主能调整电脑难度');
+  if(room.phase!=='lobby')throw Error('牌局开始后不能调整电脑难度');
+  room.botDifficulty=normalizeBotDifficulty(difficulty);broadcast(room);return room.botDifficulty;
 }
 function cleanName(n){return String(n||'麻友').trim().slice(0,10)||'麻友'}
 function playerSeat(room,token){return room.players.findIndex(p=>p.token===token)}
@@ -309,30 +321,100 @@ function runFenZhang(room,startSeat,tailFirst=false){
 }
 function endDraw(room,options={}){const g=room.game;g.phase='result';g.result={draw:true,delta:Array(playerCount(room)).fill(0),fenZhang:!!options.fenZhang,fenTiles:g.fenTiles||[]};g.nextDealer=previousSeat(room,g.dealer);g.nextRound=g.round+1;log(room,options.fenZhang?'各家分张均未胡，牌局流局':'黄牌，本局不结算');broadcast(room);}
 
+function botLevel(room){return BOT_DIFFICULTIES[normalizeBotDifficulty(room.botDifficulty)].level}
+function botVisibleCount(room,id){
+  const g=room.game;let count=g.indicators.filter(t=>t.id===id).length;
+  g.discards.flat().forEach(t=>{if(t.id===id)count++});
+  g.melds.flat().flatMap(m=>m.tiles).forEach(t=>{if(t.id===id)count++});
+  g.flowers.flat().forEach(t=>{if(t.id===id)count++});
+  return count;
+}
+function botTileKeepScore(room,seat,tile,hand){
+  const g=room.game,id=tile.id;
+  if(caishenMatches(id,g.indicators))return 10000;
+  if(needsReplacement(tile,g.indicators))return 9000;
+  const same=hand.filter(t=>t.id===id).length;
+  if(id>=27)return same*10-(botVisibleCount(room,id)>=3?4:0);
+  const left=hand.filter(t=>t.id===id-1).length,right=hand.filter(t=>t.id===id+1).length;
+  const twoLeft=hand.filter(t=>t.id===id-2).length,twoRight=hand.filter(t=>t.id===id+2).length;
+  const shape=same*9+(left+right)*4+(twoLeft+twoRight)*1.5;
+  const safety=botVisibleCount(room,id)*(botLevel(room)>=2?2.2:0.8);
+  return shape+safety+(id%9===0||id%9===8?-1:0);
+}
+function botHandQuality(room,seat,hand){
+  const g=room.game;let score=0;
+  for(const t of hand){
+    if(caishenMatches(t.id,g.indicators)){score+=22;continue}
+    if(needsReplacement(t,g.indicators)){score+=15;continue}
+    const same=hand.filter(x=>x.id===t.id).length;
+    if(same>=3)score+=9;else if(same===2)score+=6;else score+=1;
+    if(t.id<27){
+      if(hand.some(x=>x.id===t.id-1))score+=2;
+      if(hand.some(x=>x.id===t.id+1))score+=2;
+      if(hand.some(x=>x.id===t.id-2)||hand.some(x=>x.id===t.id+2))score+=0.5;
+    }
+  }
+  return score;
+}
+function botDiscard(room,seat){
+  const hand=room.game.hands[seat],level=botLevel(room);
+  const candidates=hand.filter(t=>!caishenMatches(t.id,room.game.indicators)&&!needsReplacement(t,room.game.indicators));
+  if(!candidates.length)return hand[0];
+  if(level===0)return candidates[Math.floor(Math.random()*candidates.length)];
+  const scored=candidates.map(tile=>{
+    const next=hand.filter(x=>x.uid!==tile.uid);
+    let score=botHandQuality(room,seat,next)-botTileKeepScore(room,seat,tile,hand)*0.35;
+    if(level>=2&&botVisibleCount(room,tile.id)>=3)score+=4;
+    if(level===1)score+=Math.random()*2;
+    return {tile,score};
+  }).sort((a,b)=>b.score-a.score);
+  return scored[0].tile;
+}
+function botClaim(room,seat){
+  const actions=claimActions(room,seat),level=botLevel(room);
+  const hu=actions.find(a=>['hu','doubleCaishenHu','caishen31'].includes(a.type));
+  if(hu)return hu.type;
+  const gang=actions.find(a=>a.type==='minggang');
+  if(gang&&level>=1)return gang.type;
+  const peng=actions.find(a=>a.type==='peng');
+  if(!peng)return 'pass';
+  if(level===0)return Math.random()<0.35?'peng':'pass';
+  const tile=room.game.lastDiscard,hand=room.game.hands[seat];
+  const same=hand.filter(t=>t.id===tile.id).length;
+  const value=(tile.id>=27?4:tile.id%9===0||tile.id%9===8?2:1)+(same>=3?2:0);
+  return level>=3&&value>=3||level===2&&value>=4||level===1&&value>=5?'peng':'pass';
+}
+function meldsForViewer(room,viewerSeat){
+  const g=room.game;
+  return g.melds.map((melds,owner)=>melds.map(m=>{
+    if(m.type==='暗杠'&&owner!==viewerSeat&&g.phase!=='result')return {...m,tiles:m.tiles.map(t=>({uid:t.uid,concealed:true}))};
+    return {...m,tiles:m.tiles.map(t=>({...t}))};
+  }));
+}
 function scheduleBots(room){
   if(room.phase!=='playing'||!room.game||!room.players.some(p=>p.bot)||room.botTimer)return;
   room.botTimer=setTimeout(()=>{
     room.botTimer=null;const g=room.game;if(!g||g.phase!=='playing')return;
     try{
-      if(g.prompt){const seat=g.prompt.seat;if(!room.players[seat]?.bot)return;claim(room,seat,g.prompt.type);scheduleBots(room);return;}
+      if(g.prompt){const seat=g.prompt.seat;if(!room.players[seat]?.bot)return;claim(room,seat,botClaim(room,seat));scheduleBots(room);return;}
       const seat=g.current;if(!room.players[seat]?.bot)return;
       const actions=ownActions(room,seat),hu=actions.find(a=>a.type==='doubleCaishenHu'||a.type==='caishen31'||a.type==='hu'),gang=actions.find(a=>a.type==='gang'||a.type==='bugang');
       if(hu)selfAction(room,seat,hu.type);else if(gang)selfAction(room,seat,gang.type,gang.id);else{
-        const candidates=g.hands[seat].filter(t=>!caishenMatches(t.id,g.indicators));
-        const tile=candidates[Math.floor(Math.random()*candidates.length)]||g.hands[seat][0];discard(room,seat,tile.uid);
+        const tile=botDiscard(room,seat);discard(room,seat,tile.uid);
       }
       scheduleBots(room);
     }catch(e){log(room,`电脑玩家操作跳过：${e.message}`);broadcast(room);}
-  },350);
+  },260+botLevel(room)*150);
 }
 
 function viewFor(room,token){
   const seat=playerSeat(room,token),g=room.game;
-  const base={room:room.code,mode:room.mode||'four',modeName:rulesFor(room).name,playerCount:playerCount(room),minTai:rulesFor(room).minTai,doubleAt:rulesFor(room).doubleAt,phase:room.phase,seat,host:room.hostToken===token,solo:!!room.solo,players:room.players.map((p,i)=>({name:p.name,score:g?g.scores[i]:p.score,connected:p.connected,bot:!!p.bot,seat:i,wind:g?seatWindIndex(g.dealer,i,playerCount(room)):null}))};
+  const base={room:room.code,mode:room.mode||'four',modeName:rulesFor(room).name,playerCount:playerCount(room),minTai:rulesFor(room).minTai,doubleAt:rulesFor(room).doubleAt,botDifficulty:normalizeBotDifficulty(room.botDifficulty),botDifficultyName:BOT_DIFFICULTIES[normalizeBotDifficulty(room.botDifficulty)].name,phase:room.phase,seat,host:room.hostToken===token,solo:!!room.solo,players:room.players.map((p,i)=>({name:p.name,score:g?g.scores[i]:p.score,connected:p.connected,bot:!!p.bot,seat:i,wind:g?seatWindIndex(g.dealer,i,playerCount(room)):null}))};
   if(!g)return base;
+  const winCheck=g.phase==='playing'&&g.current===seat&&!g.prompt?{shape:canWin(g.hands[seat],g.melds[seat].length,g.indicators),...winningTai(room,seat,true,g.winContext[seat]||{})}:null;
   return {...base,phase:g.phase,dealer:g.dealer,round:g.round,gameId:g.gameId,current:g.current,wallCount:remainingWallCount(room),reservedWallCount:reservedWallCount(room),indicators:g.indicators,
-    hand:g.hands[seat]||[],revealedHands:g.phase==='result'?g.hands:null,handCounts:g.hands.map(h=>h.length),melds:g.melds,flowers:g.flowers,discards:g.discards,drawnUid:g.current===seat?g.drawnUid:null,
-    prompt:g.prompt&&g.prompt.seat===seat?{type:g.prompt.type,label:g.prompt.label,actions:claimActions(room,seat),tile:g.pendingBuGang?.tile||g.lastDiscard}:null,waitingClaim:!!g.prompt&&g.prompt.seat!==seat,
+    hand:g.hands[seat]||[],revealedHands:g.phase==='result'?g.hands:null,handCounts:g.hands.map(h=>h.length),melds:meldsForViewer(room,seat),flowers:g.flowers,discards:g.discards,drawnUid:g.current===seat?g.drawnUid:null,
+    prompt:g.prompt&&g.prompt.seat===seat?{type:g.prompt.type,label:g.prompt.label,actions:claimActions(room,seat),tile:g.pendingBuGang?.tile||g.lastDiscard}:null,waitingClaim:!!g.prompt&&g.prompt.seat!==seat,winCheck,
     ownActions:ownActions(room,seat),logs:g.logs,visualEvents:g.visualEvents||[],result:g.phase==='result'?g.result:null};
 }
 function sendSSE(res,data){res.write(`data: ${JSON.stringify(data)}\n\n`)}
@@ -377,14 +459,14 @@ const server=http.createServer(async(req,res)=>{
       res.once('finish',()=>setTimeout(shutdownLocalServer,150));
       return json(res,200,{ok:true});
     }
-    if(req.method==='POST'&&u.pathname==='/api/create'){const b=await readBody(req),token=b.token||uid(),room=makeRoom(b.name,token,b.mode);return json(res,200,{room:room.code,token});}
-    if(req.method==='POST'&&u.pathname==='/api/solo'){const b=await readBody(req),token=uid(),room=makeSoloRoom(b.name,token,b.mode);return json(res,200,{room:room.code,token});}
+    if(req.method==='POST'&&u.pathname==='/api/create'){const b=await readBody(req),token=b.token||uid(),room=makeRoom(b.name,token,b.mode,b.botDifficulty);return json(res,200,{room:room.code,token});}
+    if(req.method==='POST'&&u.pathname==='/api/solo'){const b=await readBody(req),token=uid(),room=makeSoloRoom(b.name,token,b.mode,b.botDifficulty);return json(res,200,{room:room.code,token});}
     if(req.method==='POST'&&u.pathname==='/api/join'){const b=await readBody(req),room=rooms.get(String(b.room||''));if(!room)throw Error('房间不存在');let token=b.token,seat=playerSeat(room,token);if(seat<0){if(room.phase!=='lobby')throw Error('牌局已经开始');if(room.players.length>=playerCount(room))throw Error('房间已满');token=uid();room.players.push({token,name:cleanName(b.name),score:0,connected:true});}else room.players[seat].connected=true;broadcast(room);return json(res,200,{room:room.code,token});}
     // Polling transport for proxies that do not support Server-Sent Events (for example Quick Tunnel).
     if(req.method==='GET'&&u.pathname==='/api/state'){const room=rooms.get(u.searchParams.get('room')),token=u.searchParams.get('token');if(!room||playerSeat(room,token)<0)return json(res,404,{error:'Session not found'});room.players[playerSeat(room,token)].connected=true;return json(res,200,viewFor(room,token));}
     if(req.method==='GET'&&u.pathname==='/api/events'){const room=rooms.get(u.searchParams.get('room')),token=u.searchParams.get('token');if(!room||playerSeat(room,token)<0){res.writeHead(404);return res.end()}res.writeHead(200,{'Content-Type':'text/event-stream','Cache-Control':'no-cache','Connection':'keep-alive','X-Accel-Buffering':'no'});res.write(': connected\n\n');if(!room.clients.has(token))room.clients.set(token,new Set());room.clients.get(token).add(res);room.players[playerSeat(room,token)].connected=true;sendSSE(res,viewFor(room,token));broadcast(room);req.on('close',()=>{room.clients.get(token)?.delete(res);setTimeout(()=>{if(!room.clients.get(token)?.size){const s=playerSeat(room,token);if(s>=0)room.players[s].connected=false;broadcast(room)}},1000)});return;}
     if(req.method==='POST'&&u.pathname==='/api/leave'){const b=await readBody(req),room=rooms.get(b.room),seat=room?playerSeat(room,b.token):-1;if(!room||seat<0)return json(res,200,{ok:true});if(room.hostToken===b.token||room.solo){if(room.botTimer)clearTimeout(room.botTimer);rooms.delete(room.code);}else if(room.phase==='lobby'){room.players.splice(seat,1);}else room.players[seat].connected=false;broadcast(room);return json(res,200,{ok:true});}
-    if(req.method==='POST'&&u.pathname==='/api/action'){const b=await readBody(req),room=rooms.get(b.room),seat=room?playerSeat(room,b.token):-1;if(!room||seat<0)throw Error('身份已失效');if(b.type==='addBot')addBot(room,b.token);else if(b.type==='start'){if(room.hostToken!==b.token)throw Error('只有房主能开局');startGame(room)}else if(b.type==='discard')discard(room,seat,b.uid);else if(b.type==='claim')claim(room,seat,b.claim);else if(b.type==='self')selfAction(room,seat,b.action,b.id);else if(b.type==='confirm'){if(room.hostToken!==b.token)throw Error('只有房主能确认台数');confirmSettlement(room,b.tais)}else if(b.type==='next'){if(room.hostToken!==b.token)throw Error('等待房主开下一局');if(room.game?.result&&!room.game.result.draw&&!room.game.result.confirmed)throw Error('请先确认台数并结算筹码');startGame(room)}else throw Error('未知操作');scheduleBots(room);return json(res,200,{ok:true});}
+    if(req.method==='POST'&&u.pathname==='/api/action'){const b=await readBody(req),room=rooms.get(b.room),seat=room?playerSeat(room,b.token):-1;if(!room||seat<0)throw Error('身份已失效');if(b.type==='addBot')addBot(room,b.token);else if(b.type==='setBotDifficulty')setBotDifficulty(room,b.token,b.difficulty);else if(b.type==='start'){if(room.hostToken!==b.token)throw Error('只有房主能开局');startGame(room)}else if(b.type==='discard')discard(room,seat,b.uid);else if(b.type==='claim')claim(room,seat,b.claim);else if(b.type==='self')selfAction(room,seat,b.action,b.id);else if(b.type==='confirm'){if(room.hostToken!==b.token)throw Error('只有房主能确认台数');confirmSettlement(room,b.tais)}else if(b.type==='next'){if(room.hostToken!==b.token)throw Error('等待房主开下一局');if(room.game?.result&&!room.game.result.draw&&!room.game.result.confirmed)throw Error('请先确认台数并结算筹码');startGame(room)}else throw Error('未知操作');scheduleBots(room);return json(res,200,{ok:true});}
     serveStatic(req,res,u);
   }catch(e){json(res,400,{error:e.message||'操作失败'});}
 });
@@ -393,4 +475,4 @@ if(require.main===module)server.listen(PORT,'0.0.0.0',()=>{
   console.log(`\n台炮麻将已启动：\n  本机 http://localhost:${PORT}`);ips.forEach(ip=>console.log(`  局域网 http://${ip}:${PORT}`));console.log('\n按 Ctrl+C 停止服务器。\n');
 });
 
-module.exports={server,rooms,MODES,makeRoom,canNormalWin,winningTai,resolveForcedCaishen,selfAction,claim,canWin,canAllTriplets,caishenMatches,caishenKey,caishenTypes,caishenCounts,sameCaishenIndicators,doubleCaishenWin,specialCaishenPattern,sortHand,isBonusId,makeWall,replaceFlowers,takeIndicator,viewFor,basicTai,calculateSettlement,confirmSettlement,startGame,draw,discard,runFenZhang,makeSoloRoom,addBot,seatWindIndex,ownActions,finishWin,claimQueue,nextPromptOrTurn};
+module.exports={server,rooms,MODES,BOT_DIFFICULTIES,normalizeBotDifficulty,makeRoom,canNormalWin,winningTai,resolveForcedCaishen,selfAction,claim,canWin,canAllTriplets,caishenMatches,caishenKey,caishenTypes,caishenCounts,sameCaishenIndicators,doubleCaishenWin,specialCaishenPattern,sortHand,isBonusId,makeWall,replaceFlowers,takeIndicator,viewFor,basicTai,calculateSettlement,confirmSettlement,startGame,draw,discard,runFenZhang,makeSoloRoom,addBot,setBotDifficulty,seatWindIndex,ownActions,finishWin,claimQueue,nextPromptOrTurn,botDiscard,botClaim,botHandQuality};
